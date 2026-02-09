@@ -71,3 +71,18 @@ USER.md
 
 # local tooling
 .serena/
+
+# IDE configurations
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Local development files
+localhost:*
+cmd.md
+project.md
+sandbox-*.md
+
+# Temporary refactor docs
+docs/refactor/
