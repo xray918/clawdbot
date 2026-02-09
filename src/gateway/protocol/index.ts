@@ -29,6 +29,18 @@ import {
   AgentsListResultSchema,
   type AgentWaitParams,
   AgentWaitParamsSchema,
+  type BillingPackagesParams,
+  BillingPackagesParamsSchema,
+  type BillingOrderCreateParams,
+  BillingOrderCreateParamsSchema,
+  type BillingOrderStatusParams,
+  BillingOrderStatusParamsSchema,
+  type BillingOrdersListParams,
+  BillingOrdersListParamsSchema,
+  type BillingPurchaseParams,
+  BillingPurchaseParamsSchema,
+  type BillingStatusParams,
+  BillingStatusParamsSchema,
   type ChannelsLogoutParams,
   ChannelsLogoutParamsSchema,
   type ChannelsStatusParams,
@@ -285,6 +297,23 @@ export const validateChannelsStatusParams = ajv.compile<ChannelsStatusParams>(
 );
 export const validateChannelsLogoutParams = ajv.compile<ChannelsLogoutParams>(
   ChannelsLogoutParamsSchema,
+);
+export const validateBillingStatusParams =
+  ajv.compile<BillingStatusParams>(BillingStatusParamsSchema);
+export const validateBillingPackagesParams = ajv.compile<BillingPackagesParams>(
+  BillingPackagesParamsSchema,
+);
+export const validateBillingOrderCreateParams = ajv.compile<BillingOrderCreateParams>(
+  BillingOrderCreateParamsSchema,
+);
+export const validateBillingOrderStatusParams = ajv.compile<BillingOrderStatusParams>(
+  BillingOrderStatusParamsSchema,
+);
+export const validateBillingOrdersListParams = ajv.compile<BillingOrdersListParams>(
+  BillingOrdersListParamsSchema,
+);
+export const validateBillingPurchaseParams = ajv.compile<BillingPurchaseParams>(
+  BillingPurchaseParamsSchema,
 );
 export const validateModelsListParams = ajv.compile<ModelsListParams>(ModelsListParamsSchema);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(SkillsStatusParamsSchema);

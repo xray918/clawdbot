@@ -13,6 +13,8 @@ import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  BillingPackage,
+  BillingStatus,
   ConfigSnapshot,
   ConfigUiHints,
   CronJob,
@@ -77,6 +79,13 @@ import {
 } from "./app-tool-stream.ts";
 import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import {
+  createBillingOrder as createBillingOrderInternal,
+  loadBilling as loadBillingInternal,
+  purchaseBillingPackage as purchaseBillingPackageInternal,
+  purchaseBillingTokens as purchaseBillingTokensInternal,
+  refreshBillingOrderStatus as refreshBillingOrderStatusInternal,
+} from "./controllers/billing.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -116,6 +125,12 @@ export class OpenClawApp extends LitElement {
   private eventLogBuffer: EventLogEntry[] = [];
   private toolStreamSyncTimer: number | null = null;
   private sidebarCloseTimer: number | null = null;
+
+  // Login state for phone auth flow
+  @state() needsLogin = false;
+  @state() loginLoading = false;
+  @state() loginError: string | null = null;
+  @state() loginPhone = "";
 
   @state() assistantName = injectedAssistantIdentity.name;
   @state() assistantAvatar = injectedAssistantIdentity.avatar;
@@ -158,6 +173,17 @@ export class OpenClawApp extends LitElement {
   @state() execApprovalBusy = false;
   @state() execApprovalError: string | null = null;
   @state() pendingGatewayUrl: string | null = null;
+
+  @state() billingLoading = false;
+  @state() billingStatus: BillingStatus | null = null;
+  @state() billingPackages: BillingPackage[] = [];
+  @state() billingOrders: import("./types.ts").BillingOrder[] = [];
+  @state() billingError: string | null = null;
+  @state() billingPurchaseBusy = false;
+  @state() billingOrderId = "";
+  @state() billingCustomTokens = "";
+  @state() billingOrderNo: string | null = null;
+  @state() billingQrDataUrl: string | null = null;
 
   @state() configLoading = false;
   @state() configRaw = "{\n}\n";
@@ -285,6 +311,9 @@ export class OpenClawApp extends LitElement {
   basePath = "";
   private popStateHandler = () =>
     onPopStateInternal(this as unknown as Parameters<typeof onPopStateInternal>[0]);
+  private oauthCallbackHandler = () => {
+    void this.checkOAuthCallback();
+  };
   private themeMedia: MediaQueryList | null = null;
   private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
@@ -296,6 +325,8 @@ export class OpenClawApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
+    window.addEventListener("pageshow", this.oauthCallbackHandler);
+    window.addEventListener("hashchange", this.oauthCallbackHandler);
   }
 
   protected firstUpdated() {
@@ -303,6 +334,8 @@ export class OpenClawApp extends LitElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener("pageshow", this.oauthCallbackHandler);
+    window.removeEventListener("hashchange", this.oauthCallbackHandler);
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
   }
@@ -371,6 +404,10 @@ export class OpenClawApp extends LitElement {
 
   async loadCron() {
     await loadCronInternal(this as unknown as Parameters<typeof loadCronInternal>[0]);
+  }
+
+  async loadBilling() {
+    await loadBillingInternal(this as unknown as Parameters<typeof loadBillingInternal>[0]);
   }
 
   async handleAbortChat() {
@@ -459,6 +496,28 @@ export class OpenClawApp extends LitElement {
     }
   }
 
+  async handleBillingPurchasePackage(packageId: string) {
+    await purchaseBillingPackageInternal(this, {
+      packageId,
+      orderId: this.billingOrderId.trim() || undefined,
+    });
+  }
+
+  async handleBillingPurchaseTokens(tokens: number) {
+    await purchaseBillingTokensInternal(this, {
+      tokens,
+      orderId: this.billingOrderId.trim() || undefined,
+    });
+  }
+
+  async handleBillingCreateOrder(packageId: string) {
+    await createBillingOrderInternal(this, packageId);
+  }
+
+  async handleBillingRefreshOrder(orderNo: string) {
+    await refreshBillingOrderStatusInternal(this, orderNo);
+  }
+
   handleGatewayUrlConfirm() {
     const nextGatewayUrl = this.pendingGatewayUrl;
     if (!nextGatewayUrl) {
@@ -507,6 +566,60 @@ export class OpenClawApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  // Phone login handler — POST phone number to gateway, get token back
+  async handleLogin() {
+    const phone = this.loginPhone.trim();
+    if (!phone) {
+      this.loginError = "请输入手机号";
+      return;
+    }
+    this.loginLoading = true;
+    this.loginError = null;
+
+    try {
+      const res = await fetch("/auth/phone-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = (await res.json()) as { token?: string; error?: string; message?: string };
+      if (!res.ok || !data.token) {
+        this.loginError = data.message ?? data.error ?? "登录失败";
+        this.loginLoading = false;
+        return;
+      }
+      // Save token to settings and reconnect
+      this.applySettings({ ...this.settings, token: data.token });
+      this.needsLogin = false;
+      this.loginError = null;
+      this.loginLoading = false;
+      this.connect();
+    } catch {
+      this.loginError = "网络错误，请稍后重试";
+      this.loginLoading = false;
+    }
+  }
+
+  // Handle phone input change
+  handlePhoneChange(phone: string) {
+    this.loginPhone = phone;
+  }
+
+  // Check for OAuth callback token in URL (kept for backward compat, now a no-op)
+  checkOAuthCallback() {
+    return false;
+  }
+
+  // Handle authentication failure - show login page
+  handleAuthFailure(reason?: string) {
+    this.needsLogin = true;
+    this.loginLoading = false;
+    // Only show error for actual auth failures, not for initial "no token" state
+    if (reason && reason !== "token_missing" && reason !== "unauthorized") {
+      this.loginError = `认证失败: ${reason}`;
+    }
   }
 
   render() {

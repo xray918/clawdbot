@@ -266,6 +266,28 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    billing: z
+      .object({
+        enabled: z.boolean().optional(),
+        dailyFreeTokens: z.number().int().nonnegative().optional(),
+        initialTokenBalance: z.number().int().nonnegative().optional(),
+        estimateOutputTokens: z.number().int().nonnegative().optional(),
+        estimateImageTokens: z.number().int().nonnegative().optional(),
+        packages: z
+          .array(
+            z
+              .object({
+                id: z.string().min(1),
+                name: z.string().min(1),
+                tokens: z.number().int().positive(),
+                priceCny: z.number().nonnegative().optional(),
+              })
+              .strict(),
+          )
+          .optional(),
+      })
+      .strict()
+      .optional(),
     models: ModelsConfigSchema,
     nodeHost: NodeHostSchema,
     agents: AgentsSchema,
@@ -386,7 +408,9 @@ export const OpenClawSchema = z
           .optional(),
         auth: z
           .object({
-            mode: z.union([z.literal("token"), z.literal("password")]).optional(),
+            mode: z
+              .union([z.literal("token"), z.literal("password"), z.literal("phone")])
+              .optional(),
             token: z.string().optional(),
             password: z.string().optional(),
             allowTailscale: z.boolean().optional(),

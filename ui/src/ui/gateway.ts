@@ -152,7 +152,8 @@ export class GatewayBrowserClient {
         deviceId: deviceIdentity.deviceId,
         role,
       })?.token;
-      authToken = storedToken ?? this.opts.token;
+      // Prefer shared gateway token (OAuth) when available.
+      authToken = this.opts.token ?? storedToken;
       canFallbackToShared = Boolean(storedToken && this.opts.token);
     }
     const auth =

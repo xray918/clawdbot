@@ -7,7 +7,7 @@ export const TAB_GROUPS = [
     tabs: ["overview", "channels", "instances", "sessions", "cron"],
   },
   { label: "Agent", tabs: ["agents", "skills", "nodes"] },
-  { label: "Settings", tabs: ["config", "debug", "logs"] },
+  { label: "Settings", tabs: ["config", "billing", "debug", "logs"] },
 ] as const;
 
 export type Tab =
@@ -21,6 +21,7 @@ export type Tab =
   | "nodes"
   | "chat"
   | "config"
+  | "billing"
   | "debug"
   | "logs";
 
@@ -35,6 +36,7 @@ const TAB_PATHS: Record<Tab, string> = {
   nodes: "/nodes",
   chat: "/chat",
   config: "/config",
+  billing: "/billing",
   debug: "/debug",
   logs: "/logs",
 };
@@ -142,6 +144,8 @@ export function iconForTab(tab: Tab): IconName {
       return "monitor";
     case "config":
       return "settings";
+    case "billing":
+      return "barChart";
     case "debug":
       return "bug";
     case "logs":
@@ -164,7 +168,7 @@ export function titleForTab(tab: Tab) {
     case "sessions":
       return "Sessions";
     case "cron":
-      return "Cron Jobs";
+      return "定时任务";
     case "skills":
       return "Skills";
     case "nodes":
@@ -173,6 +177,8 @@ export function titleForTab(tab: Tab) {
       return "Chat";
     case "config":
       return "Config";
+    case "billing":
+      return "计费";
     case "debug":
       return "Debug";
     case "logs":
@@ -195,7 +201,7 @@ export function subtitleForTab(tab: Tab) {
     case "sessions":
       return "Inspect active sessions and adjust per-session defaults.";
     case "cron":
-      return "Schedule wakeups and recurring agent runs.";
+      return "管理定时任务与执行记录。";
     case "skills":
       return "Manage skill availability and API key injection.";
     case "nodes":
@@ -204,6 +210,8 @@ export function subtitleForTab(tab: Tab) {
       return "Direct gateway chat session for quick interventions.";
     case "config":
       return "Edit ~/.openclaw/openclaw.json safely.";
+    case "billing":
+      return "管理套餐、余额与充值记录。";
     case "debug":
       return "Gateway snapshots, events, and manual RPC calls.";
     case "logs":

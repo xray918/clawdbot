@@ -146,7 +146,8 @@ export function attachGatewayWsMessageHandler(params: {
   gatewayMethods: string[];
   events: string[];
   extraHandlers: GatewayRequestHandlers;
-  buildRequestContext: () => GatewayRequestContext;
+  buildRequestContext: (opts?: { tenantId?: string }) => GatewayRequestContext;
+  tenantId?: string;
   send: (obj: unknown) => void;
   close: (code?: number, reason?: string) => void;
   isClosed: () => boolean;
@@ -177,6 +178,7 @@ export function attachGatewayWsMessageHandler(params: {
     events,
     extraHandlers,
     buildRequestContext,
+    tenantId,
     send,
     close,
     isClosed,
@@ -190,6 +192,8 @@ export function attachGatewayWsMessageHandler(params: {
     logHealth,
     logWsControl,
   } = params;
+
+  let connectionTenantId = tenantId;
 
   const configSnapshot = loadConfig();
   const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
@@ -419,6 +423,9 @@ export function attachGatewayWsMessageHandler(params: {
         let authOk = authResult.ok;
         let authMethod =
           authResult.method ?? (resolvedAuth.mode === "password" ? "password" : "token");
+        if (authResult.tenantId) {
+          connectionTenantId = authResult.tenantId;
+        }
         const sharedAuthResult = hasSharedAuth
           ? await authorizeGatewayConnect({
               auth: { ...resolvedAuth, allowTailscale: false },
@@ -690,7 +697,7 @@ export function attachGatewayWsMessageHandler(params: {
               remoteIp: reportedClientIp,
               silent: isLocalClient,
             });
-            const context = buildRequestContext();
+            const context = buildRequestContext({ tenantId: connectionTenantId });
             if (pairing.request.silent === true) {
               const approved = await approveDevicePairing(pairing.request.requestId);
               if (approved) {
@@ -882,11 +889,12 @@ export function attachGatewayWsMessageHandler(params: {
           connect: connectParams,
           connId,
           presenceKey,
+          tenantId: connectionTenantId,
         };
         setClient(nextClient);
         setHandshakeState("connected");
         if (role === "node") {
-          const context = buildRequestContext();
+          const context = buildRequestContext({ tenantId: connectionTenantId });
           const nodeSession = context.nodeRegistry.register(nextClient, {
             remoteIp: reportedClientIp,
           });
@@ -990,7 +998,7 @@ export function attachGatewayWsMessageHandler(params: {
           client,
           isWebchatConnect,
           extraHandlers,
-          context: buildRequestContext(),
+          context: buildRequestContext({ tenantId: connectionTenantId }),
         });
       })().catch((err) => {
         logGateway.error(`request handler failed: ${formatForLog(err)}`);

@@ -28,6 +28,14 @@ import type {
   SkillsUpdateParamsSchema,
 } from "./agents-models-skills.js";
 import type {
+  BillingPackagesParamsSchema,
+  BillingOrderCreateParamsSchema,
+  BillingOrderStatusParamsSchema,
+  BillingOrdersListParamsSchema,
+  BillingPurchaseParamsSchema,
+  BillingStatusParamsSchema,
+} from "./billing.js";
+import type {
   ChannelsLogoutParamsSchema,
   ChannelsStatusParamsSchema,
   ChannelsStatusResultSchema,
@@ -177,6 +185,12 @@ export type ChannelsStatusResult = Static<typeof ChannelsStatusResultSchema>;
 export type ChannelsLogoutParams = Static<typeof ChannelsLogoutParamsSchema>;
 export type WebLoginStartParams = Static<typeof WebLoginStartParamsSchema>;
 export type WebLoginWaitParams = Static<typeof WebLoginWaitParamsSchema>;
+export type BillingStatusParams = Static<typeof BillingStatusParamsSchema>;
+export type BillingPackagesParams = Static<typeof BillingPackagesParamsSchema>;
+export type BillingPurchaseParams = Static<typeof BillingPurchaseParamsSchema>;
+export type BillingOrderCreateParams = Static<typeof BillingOrderCreateParamsSchema>;
+export type BillingOrderStatusParams = Static<typeof BillingOrderStatusParamsSchema>;
+export type BillingOrdersListParams = Static<typeof BillingOrdersListParamsSchema>;
 export type AgentSummary = Static<typeof AgentSummarySchema>;
 export type AgentsFileEntry = Static<typeof AgentsFileEntrySchema>;
 export type AgentsFilesListParams = Static<typeof AgentsFilesListParamsSchema>;

@@ -1,9 +1,9 @@
 import type { IncomingMessage } from "node:http";
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, randomBytes, createHash } from "node:crypto";
 import type { GatewayAuthConfig, GatewayTailscaleMode } from "../config/config.js";
 import { readTailscaleWhoisIdentity, type TailscaleWhoisIdentity } from "../infra/tailscale.js";
 import { isTrustedProxyAddress, parseForwardedForClientIp, resolveGatewayClientIp } from "./net.js";
-export type ResolvedGatewayAuthMode = "token" | "password";
+export type ResolvedGatewayAuthMode = "token" | "password" | "phone";
 
 export type ResolvedGatewayAuth = {
   mode: ResolvedGatewayAuthMode;
@@ -16,6 +16,7 @@ export type GatewayAuthResult = {
   ok: boolean;
   method?: "token" | "password" | "tailscale" | "device-token";
   user?: string;
+  tenantId?: string;
   reason?: string;
 };
 
@@ -41,6 +42,51 @@ function safeEqual(a: string, b: string): boolean {
 
 function normalizeLogin(login: string): string {
   return login.trim().toLowerCase();
+}
+
+/**
+ * Phone auth token store (in-memory).
+ * Maps token → { phone, createdAt }.
+ * Tokens expire after 7 days.
+ */
+const PHONE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const phoneTokenStore = new Map<string, { phone: string; createdAt: number }>();
+
+// Clean up expired phone tokens every 10 minutes
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [token, data] of phoneTokenStore.entries()) {
+      if (now - data.createdAt > PHONE_TOKEN_TTL_MS) {
+        phoneTokenStore.delete(token);
+      }
+    }
+  },
+  10 * 60 * 1000,
+);
+
+/** Create a phone auth token and store the mapping. */
+export function createPhoneToken(phone: string): string {
+  const random = randomBytes(32).toString("hex");
+  const hash = createHash("sha256").update(`${phone}:${random}:${Date.now()}`).digest("hex");
+  const token = `phone_${hash}`;
+  phoneTokenStore.set(token, { phone, createdAt: Date.now() });
+  return token;
+}
+
+/** Verify a phone auth token, return phone number if valid. */
+export function verifyPhoneToken(
+  token: string,
+): { ok: true; phone: string } | { ok: false; reason: string } {
+  const data = phoneTokenStore.get(token);
+  if (!data) {
+    return { ok: false, reason: "token_mismatch" };
+  }
+  if (Date.now() - data.createdAt > PHONE_TOKEN_TTL_MS) {
+    phoneTokenStore.delete(token);
+    return { ok: false, reason: "token_expired" };
+  }
+  return { ok: true, phone: data.phone };
 }
 
 function isLoopbackAddress(ip: string | undefined): boolean {
@@ -233,6 +279,7 @@ export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
   if (auth.mode === "password" && !auth.password) {
     throw new Error("gateway auth mode is password, but no password was configured");
   }
+  // phone mode needs no upfront config — tokens are issued at login time
 }
 
 export async function authorizeGatewayConnect(params: {
@@ -271,6 +318,18 @@ export async function authorizeGatewayConnect(params: {
       return { ok: false, reason: "token_mismatch" };
     }
     return { ok: true, method: "token" };
+  }
+
+  if (auth.mode === "phone") {
+    if (!connectAuth?.token) {
+      return { ok: false, reason: "token_missing" };
+    }
+    const verify = verifyPhoneToken(connectAuth.token);
+    if (!verify.ok) {
+      return { ok: false, reason: verify.reason };
+    }
+    // Use phone number as both user and tenantId for multi-user isolation
+    return { ok: true, method: "token", user: verify.phone, tenantId: verify.phone };
   }
 
   if (auth.mode === "password") {

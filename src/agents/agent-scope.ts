@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
-import { resolveStateDir } from "../config/paths.js";
+import { resolveStateDir, resolveTenantStateDir } from "../config/paths.js";
 import {
   DEFAULT_AGENT_ID,
   normalizeAgentId,
@@ -164,29 +164,43 @@ export function resolveAgentModelFallbacksOverride(
   return Array.isArray(raw.fallbacks) ? raw.fallbacks : undefined;
 }
 
-export function resolveAgentWorkspaceDir(cfg: OpenClawConfig, agentId: string) {
+export function resolveAgentWorkspaceDir(
+  cfg: OpenClawConfig,
+  agentId: string,
+  opts?: { tenantId?: string },
+) {
   const id = normalizeAgentId(agentId);
   const configured = resolveAgentConfig(cfg, id)?.workspace?.trim();
   if (configured) {
     return resolveUserPath(configured);
   }
+  const tenantId = opts?.tenantId;
+  const tenantRoot = tenantId ? resolveTenantStateDir(tenantId) : null;
   const defaultAgentId = resolveDefaultAgentId(cfg);
   if (id === defaultAgentId) {
     const fallback = cfg.agents?.defaults?.workspace?.trim();
     if (fallback) {
       return resolveUserPath(fallback);
     }
-    return DEFAULT_AGENT_WORKSPACE_DIR;
+    return tenantRoot ? path.join(tenantRoot, "workspace") : DEFAULT_AGENT_WORKSPACE_DIR;
   }
-  return path.join(os.homedir(), ".openclaw", `workspace-${id}`);
+  return tenantRoot
+    ? path.join(tenantRoot, `workspace-${id}`)
+    : path.join(os.homedir(), ".openclaw", `workspace-${id}`);
 }
 
-export function resolveAgentDir(cfg: OpenClawConfig, agentId: string) {
+export function resolveAgentDir(
+  cfg: OpenClawConfig,
+  agentId: string,
+  opts?: { tenantId?: string },
+) {
   const id = normalizeAgentId(agentId);
   const configured = resolveAgentConfig(cfg, id)?.agentDir?.trim();
   if (configured) {
     return resolveUserPath(configured);
   }
-  const root = resolveStateDir(process.env, os.homedir);
+  const root = opts?.tenantId
+    ? resolveTenantStateDir(opts.tenantId, process.env, os.homedir)
+    : resolveStateDir(process.env, os.homedir);
   return path.join(root, "agents", id, "agent");
 }

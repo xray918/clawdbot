@@ -21,17 +21,17 @@ import {
   validateSkillsUpdateParams,
 } from "../protocol/index.js";
 
-function listWorkspaceDirs(cfg: OpenClawConfig): string[] {
+function listWorkspaceDirs(cfg: OpenClawConfig, tenantId?: string): string[] {
   const dirs = new Set<string>();
   const list = cfg.agents?.list;
   if (Array.isArray(list)) {
     for (const entry of list) {
       if (entry && typeof entry === "object" && typeof entry.id === "string") {
-        dirs.add(resolveAgentWorkspaceDir(cfg, entry.id));
+        dirs.add(resolveAgentWorkspaceDir(cfg, entry.id, { tenantId }));
       }
     }
   }
-  dirs.add(resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg)));
+  dirs.add(resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg), { tenantId }));
   return [...dirs];
 }
 
@@ -67,7 +67,7 @@ function collectSkillBins(entries: SkillEntry[]): string[] {
 }
 
 export const skillsHandlers: GatewayRequestHandlers = {
-  "skills.status": ({ params, respond }) => {
+  "skills.status": ({ params, respond, context }) => {
     if (!validateSkillsStatusParams(params)) {
       respond(
         false,
@@ -93,14 +93,14 @@ export const skillsHandlers: GatewayRequestHandlers = {
         return;
       }
     }
-    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId, { tenantId: context.tenantId });
     const report = buildWorkspaceSkillStatus(workspaceDir, {
       config: cfg,
       eligibility: { remote: getRemoteSkillEligibility() },
     });
     respond(true, report, undefined);
   },
-  "skills.bins": ({ params, respond }) => {
+  "skills.bins": ({ params, respond, context }) => {
     if (!validateSkillsBinsParams(params)) {
       respond(
         false,
@@ -113,7 +113,7 @@ export const skillsHandlers: GatewayRequestHandlers = {
       return;
     }
     const cfg = loadConfig();
-    const workspaceDirs = listWorkspaceDirs(cfg);
+    const workspaceDirs = listWorkspaceDirs(cfg, context.tenantId);
     const bins = new Set<string>();
     for (const workspaceDir of workspaceDirs) {
       const entries = loadWorkspaceSkillEntries(workspaceDir, { config: cfg });

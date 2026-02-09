@@ -10,6 +10,7 @@ import { isWebchatClient } from "../../utils/message-channel.js";
 import { isLoopbackAddress } from "../net.js";
 import { getHandshakeTimeoutMs } from "../server-constants.js";
 import { formatError } from "../server-utils.js";
+import { resolveTenantIdFromRequest } from "../tenant.js";
 import { logWs } from "../ws-log.js";
 import { getHealthVersion, getPresenceVersion, incrementPresenceVersion } from "./health-state.js";
 import { attachGatewayWsMessageHandler } from "./ws-connection/message-handler.js";
@@ -38,7 +39,7 @@ export function attachGatewayWsConnectionHandler(params: {
       stateVersion?: { presence?: number; health?: number };
     },
   ) => void;
-  buildRequestContext: () => GatewayRequestContext;
+  buildRequestContext: (opts?: { tenantId?: string }) => GatewayRequestContext;
 }) {
   const {
     wss,
@@ -76,6 +77,7 @@ export function attachGatewayWsConnectionHandler(params: {
     const canvasHostPortForWs = canvasHostServerPort ?? (canvasHostEnabled ? port : undefined);
     const canvasHostOverride =
       gatewayHost && gatewayHost !== "0.0.0.0" && gatewayHost !== "::" ? gatewayHost : undefined;
+    const tenantId = resolveTenantIdFromRequest(upgradeReq);
     const canvasHostUrl = resolveCanvasHostUrl({
       canvasPort: canvasHostPortForWs,
       hostOverride: canvasHostServerPort ? canvasHostOverride : undefined,
@@ -195,7 +197,7 @@ export function attachGatewayWsConnectionHandler(params: {
         );
       }
       if (client?.connect?.role === "node") {
-        const context = buildRequestContext();
+        const context = buildRequestContext({ tenantId: client?.tenantId ?? tenantId });
         const nodeId = context.nodeRegistry.unregister(connId);
         if (nodeId) {
           context.nodeUnsubscribeAll(nodeId);
@@ -244,6 +246,7 @@ export function attachGatewayWsConnectionHandler(params: {
       events,
       extraHandlers,
       buildRequestContext,
+      tenantId,
       send,
       close,
       isClosed: () => closed,

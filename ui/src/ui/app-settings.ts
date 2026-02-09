@@ -252,6 +252,9 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadConfigSchema(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as OpenClawApp);
   }
+  if (host.tab === "billing") {
+    await (host as unknown as OpenClawApp).loadBilling();
+  }
   if (host.tab === "debug") {
     await loadDebug(host as unknown as OpenClawApp);
     host.eventLog = host.eventLogBuffer;

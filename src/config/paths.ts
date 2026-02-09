@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { OpenClawConfig } from "./types.js";
+import { getTenantContextId } from "../infra/tenant-context.js";
 
 /**
  * Nix mode detection: When OPENCLAW_NIX_MODE=1, the gateway is running under Nix.
@@ -71,6 +72,41 @@ export function resolveStateDir(
     return existingLegacy;
   }
   return newDir;
+}
+
+const TENANT_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+
+function normalizeTenantId(value: string | undefined | null): string | undefined {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (TENANT_ID_RE.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return undefined;
+}
+
+export function resolveTenantStateDir(
+  tenantId?: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+  homedir: () => string = os.homedir,
+): string {
+  const base = resolveStateDir(env, homedir);
+  const normalized = normalizeTenantId(tenantId);
+  if (!normalized) {
+    return base;
+  }
+  return path.join(base, "tenants", normalized);
+}
+
+export function resolveTenantConfigPath(
+  tenantId?: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+  homedir: () => string = os.homedir,
+): string {
+  const base = resolveTenantStateDir(tenantId, env, homedir);
+  return path.join(base, "config", "openclaw.json");
 }
 
 function resolveUserPath(input: string): string {
@@ -223,7 +259,13 @@ export function resolveOAuthDir(
   if (override) {
     return resolveUserPath(override);
   }
-  return path.join(stateDir, "credentials");
+  const defaultStateDir = resolveStateDir(env, os.homedir);
+  const tenantId = getTenantContextId();
+  const resolvedStateDir =
+    tenantId && stateDir === defaultStateDir
+      ? resolveTenantStateDir(tenantId, env, os.homedir)
+      : stateDir;
+  return path.join(resolvedStateDir, "credentials");
 }
 
 export function resolveOAuthPath(
@@ -231,6 +273,24 @@ export function resolveOAuthPath(
   stateDir: string = resolveStateDir(env, os.homedir),
 ): string {
   return path.join(resolveOAuthDir(env, stateDir), OAUTH_FILENAME);
+}
+
+export function resolveTenantOAuthDir(
+  tenantId?: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+  homedir: () => string = os.homedir,
+): string {
+  const stateDir = resolveTenantStateDir(tenantId, env, homedir);
+  return resolveOAuthDir(env, stateDir);
+}
+
+export function resolveTenantOAuthPath(
+  tenantId?: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+  homedir: () => string = os.homedir,
+): string {
+  const stateDir = resolveTenantStateDir(tenantId, env, homedir);
+  return resolveOAuthPath(env, stateDir);
 }
 
 export function resolveGatewayPort(

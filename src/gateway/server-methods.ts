@@ -1,7 +1,9 @@
 import type { GatewayRequestHandlers, GatewayRequestOptions } from "./server-methods/types.js";
+import { withTenantContext } from "../infra/tenant-context.js";
 import { ErrorCodes, errorShape } from "./protocol/index.js";
 import { agentHandlers } from "./server-methods/agent.js";
 import { agentsHandlers } from "./server-methods/agents.js";
+import { billingHandlers } from "./server-methods/billing.js";
 import { browserHandlers } from "./server-methods/browser.js";
 import { channelsHandlers } from "./server-methods/channels.js";
 import { chatHandlers } from "./server-methods/chat.js";
@@ -47,7 +49,7 @@ const PAIRING_METHODS = new Set([
   "device.token.revoke",
   "node.rename",
 ]);
-const ADMIN_METHOD_PREFIXES = ["exec.approvals."];
+const ADMIN_METHOD_PREFIXES = ["exec.approvals.", "billing."];
 const READ_METHODS = new Set([
   "health",
   "logs.tail",
@@ -67,6 +69,10 @@ const READ_METHODS = new Set([
   "cron.list",
   "cron.status",
   "cron.runs",
+  "billing.status",
+  "billing.packages",
+  "billing.order.status",
+  "billing.orders.list",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -88,6 +94,8 @@ const WRITE_METHODS = new Set([
   "chat.send",
   "chat.abort",
   "browser.request",
+  "billing.purchase",
+  "billing.order.create",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -159,7 +167,23 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   return errorShape(ErrorCodes.INVALID_REQUEST, "missing scope: operator.admin");
 }
 
+function authorizeTenantRequest(
+  req: GatewayRequestOptions["req"],
+  context: GatewayRequestOptions["context"],
+): ErrorShape | null {
+  const rawTenant = (req.params as { tenantId?: unknown } | undefined)?.tenantId;
+  const tenantFromParams = typeof rawTenant === "string" ? rawTenant.trim() : "";
+  if (!tenantFromParams || !context.tenantId) {
+    return null;
+  }
+  if (tenantFromParams !== context.tenantId) {
+    return errorShape(ErrorCodes.INVALID_REQUEST, "tenant mismatch");
+  }
+  return null;
+}
+
 export const coreGatewayHandlers: GatewayRequestHandlers = {
+  ...billingHandlers,
   ...connectHandlers,
   ...logsHandlers,
   ...voicewakeHandlers,
@@ -196,6 +220,11 @@ export async function handleGatewayRequest(
     respond(false, undefined, authError);
     return;
   }
+  const tenantError = authorizeTenantRequest(req, context);
+  if (tenantError) {
+    respond(false, undefined, tenantError);
+    return;
+  }
   const handler = opts.extraHandlers?.[req.method] ?? coreGatewayHandlers[req.method];
   if (!handler) {
     respond(
@@ -205,12 +234,14 @@ export async function handleGatewayRequest(
     );
     return;
   }
-  await handler({
-    req,
-    params: (req.params ?? {}) as Record<string, unknown>,
-    client,
-    isWebchatConnect,
-    respond,
-    context,
-  });
+  await withTenantContext(context.tenantId, () =>
+    handler({
+      req,
+      params: (req.params ?? {}) as Record<string, unknown>,
+      client,
+      isWebchatConnect,
+      respond,
+      context,
+    }),
+  );
 }

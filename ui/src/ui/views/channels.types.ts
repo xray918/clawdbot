@@ -8,8 +8,6 @@ import type {
   NostrProfile,
   NostrStatus,
   SignalStatus,
-  SlackStatus,
-  TelegramStatus,
   WhatsAppStatus,
 } from "../types.ts";
 import type { NostrProfileFormState } from "./channels.nostr-profile-form.ts";
@@ -51,10 +49,8 @@ export type ChannelsProps = {
 
 export type ChannelsChannelData = {
   whatsapp?: WhatsAppStatus;
-  telegram?: TelegramStatus;
   discord?: DiscordStatus | null;
   googlechat?: GoogleChatStatus | null;
-  slack?: SlackStatus | null;
   signal?: SignalStatus | null;
   imessage?: IMessageStatus | null;
   nostr?: NostrStatus | null;

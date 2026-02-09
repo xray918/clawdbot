@@ -24,6 +24,7 @@ export type RespondFn = (
 ) => void;
 
 export type GatewayRequestContext = {
+  tenantId?: string;
   deps: ReturnType<typeof createDefaultDeps>;
   cron: CronService;
   cronStorePath: string;

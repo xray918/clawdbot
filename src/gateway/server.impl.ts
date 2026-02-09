@@ -370,12 +370,26 @@ export async function startGatewayServer(
   const hasMobileNodeConnected = () => hasConnectedMobileNode(nodeRegistry);
   applyGatewayLaneConcurrency(cfgAtStart);
 
-  let cronState = buildGatewayCronService({
-    cfg: cfgAtStart,
-    deps,
-    broadcast,
-  });
-  let { cron, storePath: cronStorePath } = cronState;
+  const cronByTenant = new Map<string, ReturnType<typeof buildGatewayCronService>>();
+  const resolveCronStateForTenant = (tenantId?: string) => {
+    const key = tenantId?.trim() ? tenantId.trim().toLowerCase() : "default";
+    const cached = cronByTenant.get(key);
+    if (cached) {
+      return cached;
+    }
+    const state = buildGatewayCronService({
+      cfg: loadConfig(),
+      deps,
+      broadcast,
+      tenantId: key === "default" ? undefined : key,
+    });
+    cronByTenant.set(key, state);
+    void state.cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
+    return state;
+  };
+  const defaultCronState = resolveCronStateForTenant();
+  let cronState = defaultCronState;
+  let { cron, storePath: cronStorePath } = defaultCronState;
 
   const channelManager = createChannelManager({
     loadConfig,
@@ -465,28 +479,14 @@ export async function startGatewayServer(
 
   const canvasHostServerPort = (canvasHostServer as CanvasHostServer | null)?.port;
 
-  attachGatewayWsHandlers({
-    wss,
-    clients,
-    port,
-    gatewayHost: bindHost ?? undefined,
-    canvasHostEnabled: Boolean(canvasHost),
-    canvasHostServerPort,
-    resolvedAuth,
-    gatewayMethods,
-    events: GATEWAY_EVENTS,
-    logGateway: log,
-    logHealth,
-    logWsControl,
-    extraHandlers: {
-      ...pluginRegistry.gatewayHandlers,
-      ...execApprovalHandlers,
-    },
-    broadcast,
-    context: {
+  const buildRequestContext = (opts?: { tenantId?: string }) => {
+    const tenantId = opts?.tenantId;
+    const cronState = resolveCronStateForTenant(tenantId);
+    return {
+      tenantId,
       deps,
-      cron,
-      cronStorePath,
+      cron: cronState.cron,
+      cronStorePath: cronState.storePath,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
@@ -519,7 +519,27 @@ export async function startGatewayServer(
       markChannelLoggedOut,
       wizardRunner,
       broadcastVoiceWakeChanged,
+    };
+  };
+  attachGatewayWsHandlers({
+    wss,
+    clients,
+    port,
+    gatewayHost: bindHost ?? undefined,
+    canvasHostEnabled: Boolean(canvasHost),
+    canvasHostServerPort,
+    resolvedAuth,
+    gatewayMethods,
+    events: GATEWAY_EVENTS,
+    logGateway: log,
+    logHealth,
+    logWsControl,
+    extraHandlers: {
+      ...pluginRegistry.gatewayHandlers,
+      ...execApprovalHandlers,
     },
+    broadcast,
+    buildRequestContext,
   });
   logGatewayStartup({
     cfg: cfgAtStart,
@@ -567,6 +587,7 @@ export async function startGatewayServer(
       cronState = nextState.cronState;
       cron = cronState.cron;
       cronStorePath = cronState.storePath;
+      cronByTenant.set("default", cronState);
       browserControl = nextState.browserControl;
     },
     startChannel,

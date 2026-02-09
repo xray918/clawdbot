@@ -31,6 +31,7 @@ type LifecycleHost = {
   logsEntries: unknown[];
   popStateHandler: () => void;
   topbarObserver: ResizeObserver | null;
+  checkOAuthCallback?: () => boolean;
 };
 
 export function handleConnected(host: LifecycleHost) {
@@ -40,7 +41,14 @@ export function handleConnected(host: LifecycleHost) {
   syncThemeWithSettings(host as unknown as Parameters<typeof syncThemeWithSettings>[0]);
   attachThemeListener(host as unknown as Parameters<typeof attachThemeListener>[0]);
   window.addEventListener("popstate", host.popStateHandler);
-  connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
+
+  // Check for OAuth callback first
+  const hasOAuthToken = host.checkOAuthCallback?.() ?? false;
+  if (!hasOAuthToken) {
+    // Normal connection flow
+    connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
+  }
+
   startNodesPolling(host as unknown as Parameters<typeof startNodesPolling>[0]);
   if (host.tab === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);

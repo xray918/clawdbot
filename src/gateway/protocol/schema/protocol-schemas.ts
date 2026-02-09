@@ -30,6 +30,14 @@ import {
   SkillsUpdateParamsSchema,
 } from "./agents-models-skills.js";
 import {
+  BillingPackagesParamsSchema,
+  BillingOrderCreateParamsSchema,
+  BillingOrderStatusParamsSchema,
+  BillingOrdersListParamsSchema,
+  BillingPurchaseParamsSchema,
+  BillingStatusParamsSchema,
+} from "./billing.js";
+import {
   ChannelsLogoutParamsSchema,
   ChannelsStatusParamsSchema,
   ChannelsStatusResultSchema,
@@ -188,6 +196,12 @@ export const ProtocolSchemas: Record<string, TSchema> = {
   ChannelsLogoutParams: ChannelsLogoutParamsSchema,
   WebLoginStartParams: WebLoginStartParamsSchema,
   WebLoginWaitParams: WebLoginWaitParamsSchema,
+  BillingStatusParams: BillingStatusParamsSchema,
+  BillingPackagesParams: BillingPackagesParamsSchema,
+  BillingPurchaseParams: BillingPurchaseParamsSchema,
+  BillingOrderCreateParams: BillingOrderCreateParamsSchema,
+  BillingOrderStatusParams: BillingOrderStatusParamsSchema,
+  BillingOrdersListParams: BillingOrdersListParamsSchema,
   AgentSummary: AgentSummarySchema,
   AgentsFileEntry: AgentsFileEntrySchema,
   AgentsFilesListParams: AgentsFilesListParamsSchema,

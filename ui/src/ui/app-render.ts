@@ -55,6 +55,7 @@ import { icons } from "./icons.ts";
 import { TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
 import { ConfigUiHints } from "./types.ts";
 import { renderAgents } from "./views/agents.ts";
+import { renderBilling } from "./views/billing.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
 import { renderConfig } from "./views/config.ts";
@@ -63,6 +64,7 @@ import { renderDebug } from "./views/debug.ts";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderInstances } from "./views/instances.ts";
+import { renderLogin } from "./views/login.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
@@ -89,6 +91,18 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 }
 
 export function renderApp(state: AppViewState) {
+  // Check if login is required
+  const appState = state as unknown as OpenClawApp;
+  if (appState.needsLogin) {
+    return renderLogin({
+      loading: appState.loginLoading ?? false,
+      error: appState.loginError ?? null,
+      phone: appState.loginPhone ?? "",
+      onPhoneChange: (phone: string) => appState.handlePhoneChange?.(phone),
+      onLogin: () => appState.handleLogin?.(),
+    });
+  }
+
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
@@ -950,6 +964,35 @@ export function renderApp(state: AppViewState) {
                 onSave: () => saveConfig(state as unknown as OpenClawApp),
                 onApply: () => applyConfig(state as unknown as OpenClawApp),
                 onUpdate: () => runUpdate(state as unknown as OpenClawApp),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "billing"
+            ? renderBilling({
+                loading: state.billingLoading,
+                status: state.billingStatus,
+                packages: state.billingPackages,
+                orders: state.billingOrders,
+                error: state.billingError,
+                purchaseBusy: state.billingPurchaseBusy,
+                orderId: state.billingOrderId,
+                customTokens: state.billingCustomTokens,
+                orderNo: state.billingOrderNo,
+                qrDataUrl: state.billingQrDataUrl,
+                canManualCredit: Boolean(state.hello?.auth?.scopes?.includes("operator.admin")),
+                onOrderIdChange: (next) => (state.billingOrderId = next),
+                onCustomTokensChange: (next) => (state.billingCustomTokens = next),
+                onRefresh: () => (state as unknown as OpenClawApp).loadBilling(),
+                onPurchasePackage: (packageId) =>
+                  (state as unknown as OpenClawApp).handleBillingPurchasePackage(packageId),
+                onPurchaseTokens: (tokens) =>
+                  (state as unknown as OpenClawApp).handleBillingPurchaseTokens(tokens),
+                onCreateOrder: (packageId) =>
+                  (state as unknown as OpenClawApp).handleBillingCreateOrder(packageId),
+                onRefreshOrder: (orderNo) =>
+                  (state as unknown as OpenClawApp).handleBillingRefreshOrder(orderNo),
               })
             : nothing
         }

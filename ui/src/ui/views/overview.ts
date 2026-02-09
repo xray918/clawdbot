@@ -123,33 +123,33 @@ export function renderOverview(props: OverviewProps) {
   return html`
     <section class="grid grid-cols-2">
       <div class="card">
-        <div class="card-title">Gateway Access</div>
-        <div class="card-sub">Where the dashboard connects and how it authenticates.</div>
+        <div class="card-title">网关连接</div>
+        <div class="card-sub">仪表盘连接位置与认证方式。</div>
         <div class="form-grid" style="margin-top: 16px;">
           <label class="field">
-            <span>WebSocket URL</span>
+            <span>WebSocket 地址</span>
             <input
               .value=${props.settings.gatewayUrl}
               @input=${(e: Event) => {
-                const v = (e.target as HTMLInputElement).value;
+                const v = (e.target as HTMLInputElement).value.trim();
                 props.onSettingsChange({ ...props.settings, gatewayUrl: v });
               }}
               placeholder="ws://100.x.y.z:18789"
             />
           </label>
           <label class="field">
-            <span>Gateway Token</span>
+            <span>网关 Token</span>
             <input
               .value=${props.settings.token}
               @input=${(e: Event) => {
-                const v = (e.target as HTMLInputElement).value;
+                const v = (e.target as HTMLInputElement).value.trim();
                 props.onSettingsChange({ ...props.settings, token: v });
               }}
               placeholder="OPENCLAW_GATEWAY_TOKEN"
             />
           </label>
           <label class="field">
-            <span>Password (not stored)</span>
+            <span>密码（不保存）</span>
             <input
               type="password"
               .value=${props.password}
@@ -161,7 +161,7 @@ export function renderOverview(props: OverviewProps) {
             />
           </label>
           <label class="field">
-            <span>Default Session Key</span>
+            <span>默认会话 Key</span>
             <input
               .value=${props.settings.sessionKey}
               @input=${(e: Event) => {
@@ -172,32 +172,32 @@ export function renderOverview(props: OverviewProps) {
           </label>
         </div>
         <div class="row" style="margin-top: 14px;">
-          <button class="btn" @click=${() => props.onConnect()}>Connect</button>
-          <button class="btn" @click=${() => props.onRefresh()}>Refresh</button>
-          <span class="muted">Click Connect to apply connection changes.</span>
+          <button class="btn" @click=${() => props.onConnect()}>连接</button>
+          <button class="btn" @click=${() => props.onRefresh()}>刷新</button>
+          <span class="muted">点击连接以应用连接变更。</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">Snapshot</div>
-        <div class="card-sub">Latest gateway handshake information.</div>
+        <div class="card-title">快照</div>
+        <div class="card-sub">最近一次网关握手信息。</div>
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
-            <div class="stat-label">Status</div>
+            <div class="stat-label">状态</div>
             <div class="stat-value ${props.connected ? "ok" : "warn"}">
-              ${props.connected ? "Connected" : "Disconnected"}
+              ${props.connected ? "已连接" : "未连接"}
             </div>
           </div>
           <div class="stat">
-            <div class="stat-label">Uptime</div>
+            <div class="stat-label">运行时长</div>
             <div class="stat-value">${uptime}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Tick Interval</div>
+            <div class="stat-label">Tick 间隔</div>
             <div class="stat-value">${tick}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Last Channels Refresh</div>
+            <div class="stat-label">通道最近刷新</div>
             <div class="stat-value">
               ${props.lastChannelsRefresh ? formatAgo(props.lastChannelsRefresh) : "n/a"}
             </div>
@@ -211,9 +211,7 @@ export function renderOverview(props: OverviewProps) {
               ${insecureContextHint ?? ""}
             </div>`
             : html`
-                <div class="callout" style="margin-top: 14px">
-                  Use Channels to link WhatsApp, Telegram, Discord, Signal, or iMessage.
-                </div>
+                <div class="callout" style="margin-top: 14px">使用通道配置连接飞书。</div>
               `
         }
       </div>
@@ -221,41 +219,41 @@ export function renderOverview(props: OverviewProps) {
 
     <section class="grid grid-cols-3" style="margin-top: 18px;">
       <div class="card stat-card">
-        <div class="stat-label">Instances</div>
+        <div class="stat-label">实例</div>
         <div class="stat-value">${props.presenceCount}</div>
-        <div class="muted">Presence beacons in the last 5 minutes.</div>
+        <div class="muted">最近 5 分钟的在线心跳。</div>
       </div>
       <div class="card stat-card">
-        <div class="stat-label">Sessions</div>
+        <div class="stat-label">会话</div>
         <div class="stat-value">${props.sessionsCount ?? "n/a"}</div>
-        <div class="muted">Recent session keys tracked by the gateway.</div>
+        <div class="muted">网关最近追踪的会话 Key。</div>
       </div>
       <div class="card stat-card">
-        <div class="stat-label">Cron</div>
+        <div class="stat-label">定时任务</div>
         <div class="stat-value">
-          ${props.cronEnabled == null ? "n/a" : props.cronEnabled ? "Enabled" : "Disabled"}
+          ${props.cronEnabled == null ? "n/a" : props.cronEnabled ? "启用" : "停用"}
         </div>
-        <div class="muted">Next wake ${formatNextRun(props.cronNext)}</div>
+        <div class="muted">下次执行 ${formatNextRun(props.cronNext)}</div>
       </div>
     </section>
 
     <section class="card" style="margin-top: 18px;">
-      <div class="card-title">Notes</div>
-      <div class="card-sub">Quick reminders for remote control setups.</div>
+      <div class="card-title">提示</div>
+      <div class="card-sub">远程部署的快速提示。</div>
       <div class="note-grid" style="margin-top: 14px;">
         <div>
-          <div class="note-title">Tailscale serve</div>
+          <div class="note-title">Tailscale Serve</div>
           <div class="muted">
-            Prefer serve mode to keep the gateway on loopback with tailnet auth.
+            优先使用 Serve，将网关保持在 loopback 并启用 tailnet 认证。
           </div>
         </div>
         <div>
-          <div class="note-title">Session hygiene</div>
-          <div class="muted">Use /new or sessions.patch to reset context.</div>
+          <div class="note-title">会话清理</div>
+          <div class="muted">使用 /new 或 sessions.patch 重置上下文。</div>
         </div>
         <div>
-          <div class="note-title">Cron reminders</div>
-          <div class="muted">Use isolated sessions for recurring runs.</div>
+          <div class="note-title">定时任务建议</div>
+          <div class="muted">定时任务建议使用隔离会话。</div>
         </div>
       </div>
     </section>

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { GatewayRequestHandlers } from "./types.js";
 import { listAgentIds } from "../../agents/agent-scope.js";
+import { chargeTenantTokens, estimateTokensForBilling } from "../../billing/store.js";
 import { agentCommand } from "../../commands/agent.js";
 import { loadConfig } from "../../config/config.js";
 import {
@@ -164,6 +165,27 @@ export const agentHandlers: GatewayRequestHandlers = {
       }
     }
 
+    const estimatedTokens = estimateTokensForBilling({
+      message,
+      imageCount: images.length,
+      cfg,
+    });
+    const billingCharge = await chargeTenantTokens({
+      tenantId: context.tenantId,
+      tokens: estimatedTokens,
+      cfg,
+    });
+    if (!billingCharge.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "billing limit reached", {
+          details: { reason: billingCharge.reason },
+        }),
+      );
+      return;
+    }
+
     const agentIdRaw = typeof request.agentId === "string" ? request.agentId.trim() : "";
     const agentId = agentIdRaw ? normalizeAgentId(agentIdRaw) : undefined;
     if (agentId) {
@@ -211,7 +233,9 @@ export const agentHandlers: GatewayRequestHandlers = {
     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;
 
     if (requestedSessionKey) {
-      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSessionKey);
+      const { cfg, storePath, entry, canonicalKey } = loadSessionEntry(requestedSessionKey, {
+        tenantId: context.tenantId,
+      });
       cfgForAgent = cfg;
       const now = Date.now();
       const sessionId = entry?.sessionId ?? randomUUID();
@@ -222,7 +246,9 @@ export const agentHandlers: GatewayRequestHandlers = {
         | undefined;
       if (spawnedByValue && (!resolvedGroupId || !resolvedGroupChannel || !resolvedGroupSpace)) {
         try {
-          const parentEntry = loadSessionEntry(spawnedByValue)?.entry;
+          const parentEntry = loadSessionEntry(spawnedByValue, {
+            tenantId: context.tenantId,
+          })?.entry;
           inheritedGroup = {
             groupId: parentEntry?.groupId,
             groupChannel: parentEntry?.groupChannel,

@@ -133,6 +133,13 @@ const FIELD_LABELS: Record<string, string> = {
   "gateway.remote.tlsFingerprint": "Remote Gateway TLS Fingerprint",
   "gateway.auth.token": "Gateway Token",
   "gateway.auth.password": "Gateway Password",
+  "gateway.auth.mode": "Gateway Auth Mode",
+  "billing.enabled": "Billing Enabled",
+  "billing.dailyFreeTokens": "Billing Daily Free Tokens",
+  "billing.initialTokenBalance": "Billing Initial Token Balance",
+  "billing.estimateOutputTokens": "Billing Output Token Estimate",
+  "billing.estimateImageTokens": "Billing Image Token Estimate",
+  "billing.packages": "Billing Token Packages",
   "tools.media.image.enabled": "Enable Image Understanding",
   "tools.media.image.maxBytes": "Image Understanding Max Bytes",
   "tools.media.image.maxChars": "Image Understanding Max Chars",
@@ -523,6 +530,13 @@ const FIELD_HELP: Record<string, string> = {
     "Optional per-provider overrides for billing backoff (hours).",
   "auth.cooldowns.billingMaxHours": "Cap (hours) for billing backoff (default: 24).",
   "auth.cooldowns.failureWindowHours": "Failure window (hours) for backoff counters (default: 24).",
+  "billing.enabled": "Enable per-tenant billing enforcement (default: false).",
+  "billing.dailyFreeTokens": "Daily free tokens per tenant (default: 0).",
+  "billing.initialTokenBalance": "Initial paid token balance per tenant (default: 0).",
+  "billing.estimateOutputTokens": "Estimated output tokens added per request (default: 0).",
+  "billing.estimateImageTokens": "Estimated tokens charged per image attachment (default: 0).",
+  "billing.packages":
+    "Token packages available for purchase (id, name, tokens, optional priceCny).",
   "agents.defaults.bootstrapMaxChars":
     "Max characters of each workspace bootstrap file injected into the system prompt before truncation (default: 20000).",
   "agents.defaults.repoRoot":

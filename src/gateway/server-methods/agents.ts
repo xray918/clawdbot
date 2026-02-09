@@ -161,7 +161,7 @@ export const agentsHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "unknown agent id"));
       return;
     }
-    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId, { tenantId: context.tenantId });
     const files = await listAgentFiles(workspaceDir);
     respond(true, { agentId, workspace: workspaceDir, files }, undefined);
   },
@@ -194,7 +194,7 @@ export const agentsHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId, { tenantId: context.tenantId });
     const filePath = path.join(workspaceDir, name);
     const meta = await statFile(filePath);
     if (!meta) {
@@ -256,7 +256,7 @@ export const agentsHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId, { tenantId: context.tenantId });
     await fs.mkdir(workspaceDir, { recursive: true });
     const filePath = path.join(workspaceDir, name);
     const content = String(params.content ?? "");

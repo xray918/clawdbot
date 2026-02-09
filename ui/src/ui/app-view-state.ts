@@ -12,6 +12,8 @@ import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  BillingPackage,
+  BillingStatus,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   CronJob,
@@ -41,6 +43,11 @@ export type AppViewState = {
   hello: GatewayHelloOk | null;
   lastError: string | null;
   eventLog: EventLogEntry[];
+  // Login state
+  needsLogin?: boolean;
+  loginLoading?: boolean;
+  loginError?: string | null;
+  loginPhone?: string;
   assistantName: string;
   assistantAvatar: string | null;
   assistantAgentId: string | null;
@@ -75,6 +82,16 @@ export type AppViewState = {
   execApprovalBusy: boolean;
   execApprovalError: string | null;
   pendingGatewayUrl: string | null;
+  billingLoading: boolean;
+  billingStatus: BillingStatus | null;
+  billingPackages: BillingPackage[];
+  billingOrders: import("./types.ts").BillingOrder[];
+  billingError: string | null;
+  billingPurchaseBusy: boolean;
+  billingOrderId: string;
+  billingCustomTokens: string;
+  billingOrderNo: string | null;
+  billingQrDataUrl: string | null;
   configLoading: boolean;
   configRaw: string;
   configRawOriginal: string;

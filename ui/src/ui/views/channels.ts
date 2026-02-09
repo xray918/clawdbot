@@ -9,8 +9,6 @@ import type {
   NostrProfile,
   NostrStatus,
   SignalStatus,
-  SlackStatus,
-  TelegramStatus,
   WhatsAppStatus,
 } from "../types.ts";
 import type { ChannelKey, ChannelsChannelData, ChannelsProps } from "./channels.types.ts";
@@ -22,17 +20,13 @@ import { renderIMessageCard } from "./channels.imessage.ts";
 import { renderNostrCard } from "./channels.nostr.ts";
 import { channelEnabled, renderChannelAccountCount } from "./channels.shared.ts";
 import { renderSignalCard } from "./channels.signal.ts";
-import { renderSlackCard } from "./channels.slack.ts";
-import { renderTelegramCard } from "./channels.telegram.ts";
 import { renderWhatsAppCard } from "./channels.whatsapp.ts";
 
 export function renderChannels(props: ChannelsProps) {
   const channels = props.snapshot?.channels as Record<string, unknown> | null;
   const whatsapp = (channels?.whatsapp ?? undefined) as WhatsAppStatus | undefined;
-  const telegram = (channels?.telegram ?? undefined) as TelegramStatus | undefined;
   const discord = (channels?.discord ?? null) as DiscordStatus | null;
   const googlechat = (channels?.googlechat ?? null) as GoogleChatStatus | null;
-  const slack = (channels?.slack ?? null) as SlackStatus | null;
   const signal = (channels?.signal ?? null) as SignalStatus | null;
   const imessage = (channels?.imessage ?? null) as IMessageStatus | null;
   const nostr = (channels?.nostr ?? null) as NostrStatus | null;
@@ -55,10 +49,8 @@ export function renderChannels(props: ChannelsProps) {
       ${orderedChannels.map((channel) =>
         renderChannel(channel.key, props, {
           whatsapp,
-          telegram,
           discord,
           googlechat,
-          slack,
           signal,
           imessage,
           nostr,
@@ -70,8 +62,8 @@ export function renderChannels(props: ChannelsProps) {
     <section class="card" style="margin-top: 18px;">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <div class="card-title">Channel health</div>
-          <div class="card-sub">Channel status snapshots from the gateway.</div>
+          <div class="card-title">通道概览</div>
+          <div class="card-sub">来自网关的通道状态快照。</div>
         </div>
         <div class="muted">${props.lastSuccessAt ? formatAgo(props.lastSuccessAt) : "n/a"}</div>
       </div>
@@ -89,14 +81,18 @@ ${props.snapshot ? JSON.stringify(props.snapshot, null, 2) : "No snapshot yet."}
   `;
 }
 
+const ALLOWED_CHANNELS: ChannelKey[] = ["feishu"];
+
 function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKey[] {
   if (snapshot?.channelMeta?.length) {
-    return snapshot.channelMeta.map((entry) => entry.id);
+    return snapshot.channelMeta
+      .map((entry) => entry.id)
+      .filter((id) => ALLOWED_CHANNELS.includes(id));
   }
   if (snapshot?.channelOrder?.length) {
-    return snapshot.channelOrder;
+    return snapshot.channelOrder.filter((id) => ALLOWED_CHANNELS.includes(id));
   }
-  return ["whatsapp", "telegram", "discord", "googlechat", "slack", "signal", "imessage", "nostr"];
+  return ALLOWED_CHANNELS;
 }
 
 function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChannelData) {
@@ -106,13 +102,6 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
       return renderWhatsAppCard({
         props,
         whatsapp: data.whatsapp,
-        accountCountLabel,
-      });
-    case "telegram":
-      return renderTelegramCard({
-        props,
-        telegram: data.telegram,
-        telegramAccounts: data.channelAccounts?.telegram ?? [],
         accountCountLabel,
       });
     case "discord":
@@ -125,12 +114,6 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
       return renderGoogleChatCard({
         props,
         googleChat: data.googlechat,
-        accountCountLabel,
-      });
-    case "slack":
-      return renderSlackCard({
-        props,
-        slack: data.slack,
         accountCountLabel,
       });
     case "signal":
@@ -172,8 +155,10 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
         onEditProfile: () => props.onNostrProfileEdit(accountId, profile),
       });
     }
-    default:
+    case "feishu":
       return renderGenericChannelCard(key, props, data.channelAccounts ?? {});
+    default:
+      return null;
   }
 }
 
@@ -194,7 +179,7 @@ function renderGenericChannelCard(
   return html`
     <div class="card">
       <div class="card-title">${label}</div>
-      <div class="card-sub">Channel status and configuration.</div>
+      <div class="card-sub">通道状态与配置。</div>
       ${accountCountLabel}
 
       ${
@@ -207,16 +192,16 @@ function renderGenericChannelCard(
           : html`
             <div class="status-list" style="margin-top: 16px;">
               <div>
-                <span class="label">Configured</span>
-                <span>${configured == null ? "n/a" : configured ? "Yes" : "No"}</span>
+                <span class="label">已配置</span>
+                <span>${configured == null ? "n/a" : configured ? "是" : "否"}</span>
               </div>
               <div>
-                <span class="label">Running</span>
-                <span>${running == null ? "n/a" : running ? "Yes" : "No"}</span>
+                <span class="label">运行中</span>
+                <span>${running == null ? "n/a" : running ? "是" : "否"}</span>
               </div>
               <div>
-                <span class="label">Connected</span>
-                <span>${connected == null ? "n/a" : connected ? "Yes" : "No"}</span>
+                <span class="label">已连接</span>
+                <span>${connected == null ? "n/a" : connected ? "是" : "否"}</span>
               </div>
             </div>
           `
@@ -245,6 +230,9 @@ function resolveChannelMetaMap(
 }
 
 function resolveChannelLabel(snapshot: ChannelsStatusSnapshot | null, key: string): string {
+  if (key === "feishu") {
+    return "飞书";
+  }
   const meta = resolveChannelMetaMap(snapshot)[key];
   return meta?.label ?? snapshot?.channelLabels?.[key] ?? key;
 }

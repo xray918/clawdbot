@@ -40,7 +40,7 @@ import { applySessionsPatchToStore } from "../sessions-patch.js";
 import { resolveSessionKeyFromResolveParams } from "../sessions-resolve.js";
 
 export const sessionsHandlers: GatewayRequestHandlers = {
-  "sessions.list": ({ params, respond }) => {
+  "sessions.list": ({ params, respond, context }) => {
     if (!validateSessionsListParams(params)) {
       respond(
         false,
@@ -54,16 +54,19 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
     const p = params;
     const cfg = loadConfig();
-    const { storePath, store } = loadCombinedSessionStoreForGateway(cfg);
+    const { storePath, store } = loadCombinedSessionStoreForGateway(cfg, {
+      tenantId: context.tenantId,
+    });
     const result = listSessionsFromStore({
       cfg,
       storePath,
       store,
       opts: p,
+      tenantId: context.tenantId,
     });
     respond(true, result, undefined);
   },
-  "sessions.preview": ({ params, respond }) => {
+  "sessions.preview": ({ params, respond, context }) => {
     if (!validateSessionsPreviewParams(params)) {
       respond(
         false,
@@ -101,7 +104,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
 
     for (const key of keys) {
       try {
-        const target = resolveGatewaySessionStoreTarget({ cfg, key });
+        const target = resolveGatewaySessionStoreTarget({ cfg, key, tenantId: context.tenantId });
         const store = storeCache.get(target.storePath) ?? loadSessionStore(target.storePath);
         storeCache.set(target.storePath, store);
         const entry =
@@ -173,7 +176,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
 
     const cfg = loadConfig();
-    const target = resolveGatewaySessionStoreTarget({ cfg, key });
+    const target = resolveGatewaySessionStoreTarget({ cfg, key, tenantId: context.tenantId });
     const storePath = target.storePath;
     const applied = await updateSessionStore(storePath, async (store) => {
       const primaryKey = target.storeKeys[0] ?? key;
@@ -202,7 +205,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     };
     respond(true, result, undefined);
   },
-  "sessions.reset": async ({ params, respond }) => {
+  "sessions.reset": async ({ params, respond, context }) => {
     if (!validateSessionsResetParams(params)) {
       respond(
         false,
@@ -222,7 +225,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
 
     const cfg = loadConfig();
-    const target = resolveGatewaySessionStoreTarget({ cfg, key });
+    const target = resolveGatewaySessionStoreTarget({ cfg, key, tenantId: context.tenantId });
     const storePath = target.storePath;
     const next = await updateSessionStore(storePath, (store) => {
       const primaryKey = target.storeKeys[0] ?? key;
@@ -281,7 +284,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
 
     const cfg = loadConfig();
     const mainKey = resolveMainSessionKey(cfg);
-    const target = resolveGatewaySessionStoreTarget({ cfg, key });
+    const target = resolveGatewaySessionStoreTarget({ cfg, key, tenantId: context.tenantId });
     if (target.canonicalKey === mainKey) {
       respond(
         false,
@@ -294,7 +297,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     const deleteTranscript = typeof p.deleteTranscript === "boolean" ? p.deleteTranscript : true;
 
     const storePath = target.storePath;
-    const { entry } = loadSessionEntry(key);
+    const { entry } = loadSessionEntry(key, { tenantId: context.tenantId });
     const sessionId = entry?.sessionId;
     const existed = Boolean(entry);
     const queueKeys = new Set<string>(target.storeKeys);
@@ -377,7 +380,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
         : 400;
 
     const cfg = loadConfig();
-    const target = resolveGatewaySessionStoreTarget({ cfg, key });
+    const target = resolveGatewaySessionStoreTarget({ cfg, key, tenantId: context.tenantId });
     const storePath = target.storePath;
     // Lock + read in a short critical section; transcript work happens outside.
     const compactTarget = await updateSessionStore(storePath, (store) => {

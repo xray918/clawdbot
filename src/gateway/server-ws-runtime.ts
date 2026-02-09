@@ -27,7 +27,7 @@ export function attachGatewayWsHandlers(params: {
       stateVersion?: { presence?: number; health?: number };
     },
   ) => void;
-  context: GatewayRequestContext;
+  buildRequestContext: (opts?: { tenantId?: string }) => GatewayRequestContext;
 }) {
   attachGatewayWsConnectionHandler({
     wss: params.wss,
@@ -44,6 +44,6 @@ export function attachGatewayWsHandlers(params: {
     logWsControl: params.logWsControl,
     extraHandlers: params.extraHandlers,
     broadcast: params.broadcast,
-    buildRequestContext: () => params.context,
+    buildRequestContext: params.buildRequestContext,
   });
 }

@@ -3,15 +3,14 @@ import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../../agents/ag
 import { listChannelPlugins } from "../../channels/plugins/index.js";
 import {
   CONFIG_PATH,
-  loadConfig,
+  createConfigIO,
   parseConfigJson5,
-  readConfigFileSnapshot,
   resolveConfigSnapshotHash,
   validateConfigObjectWithPlugins,
-  writeConfigFile,
 } from "../../config/config.js";
 import { applyLegacyMigrations } from "../../config/legacy.js";
 import { applyMergePatch } from "../../config/merge-patch.js";
+import { resolveTenantConfigPath } from "../../config/paths.js";
 import { buildConfigSchema } from "../../config/schema.js";
 import {
   formatDoctorNonInteractiveHint,
@@ -38,6 +37,13 @@ function resolveBaseHash(params: unknown): string | null {
   }
   const trimmed = raw.trim();
   return trimmed ? trimmed : null;
+}
+
+function resolveConfigIo(tenantId?: string) {
+  if (tenantId) {
+    return createConfigIO({ configPath: resolveTenantConfigPath(tenantId) });
+  }
+  return createConfigIO();
 }
 
 function requireConfigBaseHash(
@@ -87,7 +93,7 @@ function requireConfigBaseHash(
 }
 
 export const configHandlers: GatewayRequestHandlers = {
-  "config.get": async ({ params, respond }) => {
+  "config.get": async ({ params, respond, context }) => {
     if (!validateConfigGetParams(params)) {
       respond(
         false,
@@ -99,10 +105,11 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const snapshot = await readConfigFileSnapshot();
+    const configIo = resolveConfigIo(context.tenantId);
+    const snapshot = await configIo.readConfigFileSnapshot();
     respond(true, snapshot, undefined);
   },
-  "config.schema": ({ params, respond }) => {
+  "config.schema": ({ params, respond, context }) => {
     if (!validateConfigSchemaParams(params)) {
       respond(
         false,
@@ -114,8 +121,11 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const cfg = loadConfig();
-    const workspaceDir = resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg));
+    const configIo = resolveConfigIo(context.tenantId);
+    const cfg = configIo.loadConfig();
+    const workspaceDir = resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg), {
+      tenantId: context.tenantId,
+    });
     const pluginRegistry = loadOpenClawPlugins({
       config: cfg,
       workspaceDir,
@@ -144,7 +154,7 @@ export const configHandlers: GatewayRequestHandlers = {
     });
     respond(true, schema, undefined);
   },
-  "config.set": async ({ params, respond }) => {
+  "config.set": async ({ params, respond, context }) => {
     if (!validateConfigSetParams(params)) {
       respond(
         false,
@@ -156,7 +166,8 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const snapshot = await readConfigFileSnapshot();
+    const configIo = resolveConfigIo(context.tenantId);
+    const snapshot = await configIo.readConfigFileSnapshot();
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
@@ -185,18 +196,18 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    await writeConfigFile(validated.config);
+    await configIo.writeConfigFile(validated.config);
     respond(
       true,
       {
         ok: true,
-        path: CONFIG_PATH,
+        path: configIo.configPath ?? CONFIG_PATH,
         config: validated.config,
       },
       undefined,
     );
   },
-  "config.patch": async ({ params, respond }) => {
+  "config.patch": async ({ params, respond, context }) => {
     if (!validateConfigPatchParams(params)) {
       respond(
         false,
@@ -208,7 +219,8 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const snapshot = await readConfigFileSnapshot();
+    const configIo = resolveConfigIo(context.tenantId);
+    const snapshot = await configIo.readConfigFileSnapshot();
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
@@ -263,7 +275,7 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    await writeConfigFile(validated.config);
+    await configIo.writeConfigFile(validated.config);
 
     const sessionKey =
       typeof (params as { sessionKey?: unknown }).sessionKey === "string"
@@ -305,7 +317,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: CONFIG_PATH,
+        path: configIo.configPath ?? CONFIG_PATH,
         config: validated.config,
         restart,
         sentinel: {
@@ -316,7 +328,7 @@ export const configHandlers: GatewayRequestHandlers = {
       undefined,
     );
   },
-  "config.apply": async ({ params, respond }) => {
+  "config.apply": async ({ params, respond, context }) => {
     if (!validateConfigApplyParams(params)) {
       respond(
         false,
@@ -328,7 +340,8 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const snapshot = await readConfigFileSnapshot();
+    const configIo = resolveConfigIo(context.tenantId);
+    const snapshot = await configIo.readConfigFileSnapshot();
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
@@ -360,7 +373,7 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    await writeConfigFile(validated.config);
+    await configIo.writeConfigFile(validated.config);
 
     const sessionKey =
       typeof (params as { sessionKey?: unknown }).sessionKey === "string"
@@ -385,7 +398,7 @@ export const configHandlers: GatewayRequestHandlers = {
       doctorHint: formatDoctorNonInteractiveHint(),
       stats: {
         mode: "config.apply",
-        root: CONFIG_PATH,
+        root: configIo.configPath ?? CONFIG_PATH,
       },
     };
     let sentinelPath: string | null = null;
@@ -402,7 +415,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: CONFIG_PATH,
+        path: configIo.configPath ?? CONFIG_PATH,
         config: validated.config,
         restart,
         sentinel: {

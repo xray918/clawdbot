@@ -11,7 +11,7 @@ import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { resolveConfiguredModelRef } from "../agents/model-selection.js";
 import { type OpenClawConfig, loadConfig } from "../config/config.js";
-import { resolveStateDir } from "../config/paths.js";
+import { resolveStateDir, resolveTenantStateDir } from "../config/paths.js";
 import {
   buildGroupDisplayName,
   canonicalizeMainSessionAlias,
@@ -93,6 +93,7 @@ function resolveIdentityAvatarUrl(
   cfg: OpenClawConfig,
   agentId: string,
   avatar: string | undefined,
+  opts?: { tenantId?: string },
 ): string | undefined {
   if (!avatar) {
     return undefined;
@@ -107,7 +108,7 @@ function resolveIdentityAvatarUrl(
   if (!isWorkspaceRelativePath(trimmed)) {
     return undefined;
   }
-  const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+  const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId, { tenantId: opts?.tenantId });
   const workspaceRoot = path.resolve(workspaceDir);
   const resolved = path.resolve(workspaceRoot, trimmed);
   const relative = path.relative(workspaceRoot, resolved);
@@ -177,12 +178,12 @@ export function deriveSessionTitle(
   return undefined;
 }
 
-export function loadSessionEntry(sessionKey: string) {
+export function loadSessionEntry(sessionKey: string, opts?: { tenantId?: string }) {
   const cfg = loadConfig();
   const sessionCfg = cfg.session;
   const canonicalKey = resolveSessionStoreKey({ cfg, sessionKey });
   const agentId = resolveSessionStoreAgentId(cfg, canonicalKey);
-  const storePath = resolveStorePath(sessionCfg?.store, { agentId });
+  const storePath = resolveStorePath(sessionCfg?.store, { agentId, tenantId: opts?.tenantId });
   const store = loadSessionStore(storePath);
   const entry = store[canonicalKey];
   return { cfg, storePath, store, entry, canonicalKey };
@@ -224,8 +225,8 @@ function isStorePathTemplate(store?: string): boolean {
   return typeof store === "string" && store.includes("{agentId}");
 }
 
-function listExistingAgentIdsFromDisk(): string[] {
-  const root = resolveStateDir();
+function listExistingAgentIdsFromDisk(tenantId?: string): string[] {
+  const root = tenantId ? resolveTenantStateDir(tenantId) : resolveStateDir();
   const agentsDir = path.join(root, "agents");
   try {
     const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
@@ -297,6 +298,7 @@ export function listAgentsForGateway(cfg: OpenClawConfig): {
             cfg,
             normalizeAgentId(entry.id),
             entry.identity.avatar?.trim(),
+            { tenantId: params.tenantId },
           ),
         }
       : undefined;
@@ -401,7 +403,11 @@ function canonicalizeSpawnedByForAgent(agentId: string, spawnedBy?: string): str
   return `agent:${normalizeAgentId(agentId)}:${raw}`;
 }
 
-export function resolveGatewaySessionStoreTarget(params: { cfg: OpenClawConfig; key: string }): {
+export function resolveGatewaySessionStoreTarget(params: {
+  cfg: OpenClawConfig;
+  key: string;
+  tenantId?: string;
+}): {
   agentId: string;
   storePath: string;
   canonicalKey: string;
@@ -414,7 +420,7 @@ export function resolveGatewaySessionStoreTarget(params: { cfg: OpenClawConfig; 
   });
   const agentId = resolveSessionStoreAgentId(params.cfg, canonicalKey);
   const storeConfig = params.cfg.session?.store;
-  const storePath = resolveStorePath(storeConfig, { agentId });
+  const storePath = resolveStorePath(storeConfig, { agentId, tenantId: params.tenantId });
 
   if (canonicalKey === "global" || canonicalKey === "unknown") {
     const storeKeys = key && key !== canonicalKey ? [canonicalKey, key] : [key];
@@ -459,13 +465,16 @@ function mergeSessionEntryIntoCombined(params: {
   }
 }
 
-export function loadCombinedSessionStoreForGateway(cfg: OpenClawConfig): {
+export function loadCombinedSessionStoreForGateway(
+  cfg: OpenClawConfig,
+  opts?: { tenantId?: string },
+): {
   storePath: string;
   store: Record<string, SessionEntry>;
 } {
   const storeConfig = cfg.session?.store;
   if (storeConfig && !isStorePathTemplate(storeConfig)) {
-    const storePath = resolveStorePath(storeConfig);
+    const storePath = resolveStorePath(storeConfig, { tenantId: opts?.tenantId });
     const defaultAgentId = normalizeAgentId(resolveDefaultAgentId(cfg));
     const store = loadSessionStore(storePath);
     const combined: Record<string, SessionEntry> = {};
@@ -482,9 +491,15 @@ export function loadCombinedSessionStoreForGateway(cfg: OpenClawConfig): {
   }
 
   const agentIds = listConfiguredAgentIds(cfg);
+  const extraAgentIds = listExistingAgentIdsFromDisk(opts?.tenantId);
+  for (const id of extraAgentIds) {
+    if (!agentIds.includes(id)) {
+      agentIds.push(id);
+    }
+  }
   const combined: Record<string, SessionEntry> = {};
   for (const agentId of agentIds) {
-    const storePath = resolveStorePath(storeConfig, { agentId });
+    const storePath = resolveStorePath(storeConfig, { agentId, tenantId: opts?.tenantId });
     const store = loadSessionStore(storePath);
     for (const [key, entry] of Object.entries(store)) {
       const canonicalKey = canonicalizeSessionKeyForAgent(agentId, key);
@@ -543,6 +558,7 @@ export function listSessionsFromStore(params: {
   storePath: string;
   store: Record<string, SessionEntry>;
   opts: import("./protocol/index.js").SessionsListParams;
+  tenantId?: string;
 }): SessionsListResult {
   const { cfg, storePath, store, opts } = params;
   const now = Date.now();

@@ -1,3 +1,16 @@
+# Claude Notes
+
+## Phone login (multi-user)
+
+- Gateway auth mode `phone`: users log in with a mobile phone number (no SMS verification for now).
+- Login flow: UI collects phone → `POST /auth/phone-login` → gateway returns session token → UI stores token and connects WS.
+- Phone number becomes `tenantId` for per-user data isolation.
+- Switch to phone auth: `openclaw config set gateway.auth.mode phone` → restart gateway.
+
+## Token mode reminder
+
+- If staying on `gateway.auth.mode=token`, you must open a tokenized URL or paste the token in the Control UI settings.
+
 # Repository Guidelines
 
 - Repo: https://github.com/openclaw/openclaw

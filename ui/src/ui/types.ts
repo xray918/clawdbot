@@ -17,6 +17,41 @@ export type ChannelUiMetaEntry = {
   systemImage?: string;
 };
 
+export type BillingState = {
+  version: 1;
+  lastResetDay: string | null;
+  dailyFreeTokensUsed: number;
+  tokenBalance: number;
+  totalTokensConsumed: number;
+};
+
+export type BillingStatus = {
+  state: BillingState;
+  dailyFreeTokens: number;
+  freeTokensRemaining: number;
+  enabled: boolean;
+};
+
+export type BillingPackage = {
+  id: string;
+  name: string;
+  tokens: number;
+  priceCny?: number;
+};
+
+export type BillingOrder = {
+  orderNo: string;
+  packageId: string;
+  packageName: string;
+  tokens: number;
+  amountCny: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  codeUrl?: string;
+  transactionId?: string;
+};
+
 export const CRON_CHANNEL_LAST = "last";
 
 export type ChannelAccountSnapshot = {
