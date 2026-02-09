@@ -54,6 +54,9 @@ type GatewayHost = {
   refreshSessionsAfterChat: Set<string>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
+  // OAuth login handling
+  needsLogin?: boolean;
+  handleAuthFailure?: (reason?: string) => void;
 };
 
 type SessionDefaultsSnapshot = {
@@ -122,6 +125,18 @@ export function connectGateway(host: GatewayHost) {
   host.execApprovalQueue = [];
   host.execApprovalError = null;
 
+  // If no token is present, show login screen instead of attempting connection
+  const hasToken = host.settings.token && host.settings.token.trim() !== "";
+  if (!hasToken && host.needsLogin !== undefined && host.handleAuthFailure) {
+    host.needsLogin = true;
+    return;
+  }
+
+  // Reset login state on new connection attempt
+  if (host.needsLogin !== undefined) {
+    host.needsLogin = false;
+  }
+
   host.client?.stop();
   host.client = new GatewayBrowserClient({
     url: host.settings.gatewayUrl,
@@ -133,6 +148,9 @@ export function connectGateway(host: GatewayHost) {
       host.connected = true;
       host.lastError = null;
       host.hello = hello;
+      if (host.needsLogin !== undefined) {
+        host.needsLogin = false;
+      }
       applySnapshot(host, hello);
       // Reset orphaned chat run state from before disconnect.
       // Any in-flight run's final event was lost during the disconnect window.
@@ -148,6 +166,22 @@ export function connectGateway(host: GatewayHost) {
     },
     onClose: ({ code, reason }) => {
       host.connected = false;
+      // Code 1008 = Policy Violation, 4008 = application-level connect failure
+      // Check if this is an auth failure and trigger login
+      const isAuthFailure =
+        (code === 1008 || code === 4008) &&
+        (reason?.includes("token") || reason?.includes("unauthorized") || reason?.includes("auth"));
+      if (isAuthFailure && host.handleAuthFailure) {
+        // Stop client to prevent auto-reconnect with stale token
+        host.client?.stop();
+        const authReason = reason?.includes("token_missing")
+          ? "token_missing"
+          : reason?.includes("token_mismatch")
+            ? "token_mismatch"
+            : "unauthorized";
+        host.handleAuthFailure(authReason);
+        return;
+      }
       // Code 1012 = Service Restart (expected during config saves, don't show as error)
       if (code !== 1012) {
         host.lastError = `disconnected (${code}): ${reason || "no reason"}`;

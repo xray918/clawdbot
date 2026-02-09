@@ -96,15 +96,22 @@ export async function runEmbeddedPiAgent(
       const provider = (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
       const modelId = (params.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
       const agentDir = params.agentDir ?? resolveOpenClawAgentDir();
+      console.log(
+        `[debug-run] params.provider=${JSON.stringify(params.provider)} resolved provider=${provider} model=${modelId} agentDir=${agentDir}`,
+      );
       const fallbackConfigured =
         (params.config?.agents?.defaults?.model?.fallbacks?.length ?? 0) > 0;
       await ensureOpenClawModelsJson(params.config, agentDir);
+      console.log(`[debug-run] ensureOpenClawModelsJson done for agentDir=${agentDir}`);
 
       const { model, error, authStorage, modelRegistry } = resolveModel(
         provider,
         modelId,
         agentDir,
         params.config,
+      );
+      console.log(
+        `[debug-run] resolveModel result: model=${model ? `${(model as any).provider ?? "?"}/${(model as any).modelId ?? (model as any).id ?? "?"}` : "null"} error=${error ?? "none"} api=${model ? ((model as any).api ?? "?") : "-"}`,
       );
       if (!model) {
         throw new Error(error ?? `Unknown model: ${provider}/${modelId}`);
@@ -303,6 +310,9 @@ export async function runEmbeddedPiAgent(
         }
       }
 
+      console.log(
+        `[debug-run] auth resolved, apiKey=${apiKeyInfo ? "present" : "missing"} profileId=${lastProfileId ?? "none"}`,
+      );
       let overflowCompactionAttempted = false;
       try {
         while (true) {
@@ -312,6 +322,9 @@ export async function runEmbeddedPiAgent(
           const prompt =
             provider === "anthropic" ? scrubAnthropicRefusalMagic(params.prompt) : params.prompt;
 
+          console.log(
+            `[debug-run] calling runEmbeddedAttempt provider=${provider} model=${modelId} thinkLevel=${thinkLevel}`,
+          );
           const attempt = await runEmbeddedAttempt({
             sessionId: params.sessionId,
             sessionKey: params.sessionKey,

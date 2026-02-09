@@ -156,6 +156,7 @@ export async function runPreparedReply(
     abortedLastRun,
   } = params;
   let currentSystemSent = systemSent;
+  console.log(`[debug-get-reply-run] provider=${provider} model=${model}`);
 
   const isFirstTurnInSession = isNewSession || !currentSystemSent;
   const isGroupChat = sessionCtx.ChatType === "group";

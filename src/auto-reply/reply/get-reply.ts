@@ -78,6 +78,9 @@ export async function getReplyFromConfig(
   });
   let provider = defaultProvider;
   let model = defaultModel;
+  console.log(
+    `[debug-get-reply] resolveDefaultModel → provider=${provider} model=${model} agentId=${agentId}`,
+  );
   if (opts?.isHeartbeat) {
     const heartbeatRaw = agentCfg?.heartbeat?.model?.trim() ?? "";
     const heartbeatRef = heartbeatRaw
@@ -93,13 +96,15 @@ export async function getReplyFromConfig(
     }
   }
 
-  const workspaceDirRaw = resolveAgentWorkspaceDir(cfg, agentId) ?? DEFAULT_AGENT_WORKSPACE_DIR;
+  const tenantOpts = ctx.TenantId ? { tenantId: ctx.TenantId } : undefined;
+  const workspaceDirRaw =
+    resolveAgentWorkspaceDir(cfg, agentId, tenantOpts) ?? DEFAULT_AGENT_WORKSPACE_DIR;
   const workspace = await ensureAgentWorkspace({
     dir: workspaceDirRaw,
     ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,
   });
   const workspaceDir = workspace.dir;
-  const agentDir = resolveAgentDir(cfg, agentId);
+  const agentDir = resolveAgentDir(cfg, agentId, tenantOpts);
   const timeoutMs = resolveAgentTimeoutMs({ cfg });
   const configuredTypingSeconds =
     agentCfg?.typingIntervalSeconds ?? sessionCfg?.typingIntervalSeconds;

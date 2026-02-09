@@ -162,6 +162,9 @@ export function resolveConfiguredModelRef(params: {
     }
     return raw?.primary?.trim() ?? "";
   })();
+  console.log(
+    `[debug-resolveConfiguredModelRef] rawModel=${JSON.stringify(rawModel)} cfg.agents.defaults.model=${JSON.stringify(params.cfg.agents?.defaults?.model)}`,
+  );
   if (rawModel) {
     const trimmed = rawModel.trim();
     const aliasIndex = buildModelAliasIndex({

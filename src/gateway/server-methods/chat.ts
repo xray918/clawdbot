@@ -14,6 +14,7 @@ import {
   extractShortModelName,
   type ResponsePrefixContext,
 } from "../../auto-reply/reply/response-prefix-template.js";
+import { chargeTenantTokens, estimateTokensForBilling } from "../../billing/store.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { INTERNAL_MESSAGE_CHANNEL } from "../../utils/message-channel.js";
 import {
@@ -203,7 +204,9 @@ export const chatHandlers: GatewayRequestHandlers = {
       sessionKey: string;
       limit?: number;
     };
-    const { cfg, storePath, entry } = loadSessionEntry(sessionKey);
+    const { cfg, storePath, entry } = loadSessionEntry(sessionKey, {
+      tenantId: context.tenantId,
+    });
     const sessionId = entry?.sessionId;
     const rawMessages =
       sessionId && storePath ? readSessionMessages(sessionId, storePath, entry?.sessionFile) : [];
@@ -368,7 +371,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         return;
       }
     }
-    const { cfg, entry } = loadSessionEntry(p.sessionKey);
+    const { cfg, entry } = loadSessionEntry(p.sessionKey, { tenantId: context.tenantId });
     const timeoutMs = resolveAgentTimeoutMs({
       cfg,
       overrideMs: p.timeoutMs,
@@ -407,6 +410,27 @@ export const chatHandlers: GatewayRequestHandlers = {
         { sessionKey: p.sessionKey, stopReason: "stop" },
       );
       respond(true, { ok: true, aborted: res.aborted, runIds: res.runIds });
+      return;
+    }
+
+    const estimatedTokens = estimateTokensForBilling({
+      message: parsedMessage,
+      imageCount: parsedImages.length,
+      cfg,
+    });
+    const billingCharge = await chargeTenantTokens({
+      tenantId: context.tenantId,
+      tokens: estimatedTokens,
+      cfg,
+    });
+    if (!billingCharge.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "billing limit reached", {
+          details: { reason: billingCharge.reason },
+        }),
+      );
       return;
     }
 
@@ -471,6 +495,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         SenderName: clientInfo?.displayName,
         SenderUsername: clientInfo?.displayName,
         GatewayClientScopes: client?.connect?.scopes,
+        TenantId: context.tenantId,
       };
 
       const agentId = resolveSessionAgentId({
@@ -531,6 +556,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             if (combinedReply) {
               const { storePath: latestStorePath, entry: latestEntry } = loadSessionEntry(
                 p.sessionKey,
+                { tenantId: context.tenantId },
               );
               const sessionId = latestEntry?.sessionId ?? entry?.sessionId ?? clientRunId;
               const appended = appendAssistantTranscriptMessage({
@@ -629,7 +655,9 @@ export const chatHandlers: GatewayRequestHandlers = {
     };
 
     // Load session to find transcript file
-    const { storePath, entry } = loadSessionEntry(p.sessionKey);
+    const { storePath, entry } = loadSessionEntry(p.sessionKey, {
+      tenantId: context.tenantId,
+    });
     const sessionId = entry?.sessionId;
     if (!sessionId || !storePath) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "session not found"));

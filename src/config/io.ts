@@ -10,6 +10,7 @@ import {
   shouldDeferShellEnvFallback,
   shouldEnableShellEnvFallback,
 } from "../infra/shell-env.js";
+import { getTenantContextId } from "../infra/tenant-context.js";
 import { VERSION } from "../version.js";
 import { DuplicateAgentDirError, findDuplicateAgentDirs } from "./agent-dirs.js";
 import {
@@ -27,7 +28,12 @@ import { collectConfigEnvVars } from "./env-vars.js";
 import { ConfigIncludeError, resolveConfigIncludes } from "./includes.js";
 import { findLegacyConfigIssues } from "./legacy.js";
 import { normalizeConfigPaths } from "./normalize-paths.js";
-import { resolveConfigPath, resolveDefaultConfigCandidates, resolveStateDir } from "./paths.js";
+import {
+  resolveConfigPath,
+  resolveDefaultConfigCandidates,
+  resolveStateDir,
+  resolveTenantConfigPath,
+} from "./paths.js";
 import { applyConfigOverrides } from "./runtime-overrides.js";
 import { validateConfigObjectWithPlugins } from "./validation.js";
 import { compareOpenClawVersions } from "./version.js";
@@ -171,9 +177,12 @@ function applyConfigEnv(cfg: OpenClawConfig, env: NodeJS.ProcessEnv): void {
   }
 }
 
-function resolveConfigPathForDeps(deps: Required<ConfigIoDeps>): string {
+function resolveConfigPathForDeps(deps: Required<ConfigIoDeps>, tenantId?: string): string {
   if (deps.configPath) {
     return deps.configPath;
+  }
+  if (tenantId) {
+    return resolveTenantConfigPath(tenantId, deps.env, deps.homedir);
   }
   return resolveConfigPath(deps.env, resolveStateDir(deps.env, deps.homedir));
 }
@@ -202,10 +211,13 @@ export function parseConfigJson5(
 
 export function createConfigIO(overrides: ConfigIoDeps = {}) {
   const deps = normalizeDeps(overrides);
-  const requestedConfigPath = resolveConfigPathForDeps(deps);
+  const tenantId = getTenantContextId();
+  const requestedConfigPath = resolveConfigPathForDeps(deps, tenantId);
   const candidatePaths = deps.configPath
     ? [requestedConfigPath]
-    : resolveDefaultConfigCandidates(deps.env, deps.homedir);
+    : tenantId
+      ? [requestedConfigPath, ...resolveDefaultConfigCandidates(deps.env, deps.homedir)]
+      : resolveDefaultConfigCandidates(deps.env, deps.homedir);
   const configPath =
     candidatePaths.find((candidate) => deps.fs.existsSync(candidate)) ?? requestedConfigPath;
 
